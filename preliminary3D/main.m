@@ -584,10 +584,9 @@ if TRIALINFO.eyelinkRecording
 end
 
 %% trial begin
-blockSt = tic;
 choiceTime = nan(trialNum,1);
 Conditions = nan(trialNum,3);
-result = nan(trialNum,2); % clash(true/false) / 0 no choice, 1 speedup, 2 brake
+result = nan(trialNum,3); % clash(true/false) / 0 no choice, 1 speedup, 2 brake
 breakFlag = false;
 for triali = 1:trialNum
     trialInterval = tic;
@@ -644,6 +643,7 @@ for triali = 1:trialNum
     keyPress = 0;
     clash = false;
     speed = 1;
+    trialST = tic;
     while true
         adjustDeviation(pageUp,pageDown,deviationAdjust);
         
@@ -652,7 +652,7 @@ for triali = 1:trialNum
             if keyCode(upKey)
                 keyPress = 1;
                 speed = 3;
-                choiceTime(triali) = toc(blockSt);
+                choiceTime(triali) = toc(trialST);
                 if TRIALINFO.eyelinkRecording
                     Eyelink('message', ['Choice made as speedup 1 in trial ' num2str(triali)]);
                 end
@@ -660,7 +660,7 @@ for triali = 1:trialNum
             if keyCode(downKey)
                 keyPress = 2; 
                 speed = 3;
-                choiceTime(triali) = toc(blockSt);
+                choiceTime(triali) = toc(trialST);
                 if TRIALINFO.eyelinkRecording
                     Eyelink('message', ['Choice made as brake 2 in trial ' num2str(triali)]);
                 end
@@ -719,7 +719,7 @@ for triali = 1:trialNum
         end
     end
     %% feedback
-    result(triali,:) = [clash,keyPress];
+    result(triali,:) = [clash,keyPress,choiceTime];
     Conditions(triali,:) = conditioni;
     
     drawBinocularScene(win,cameraP,pi,framei,carP);    

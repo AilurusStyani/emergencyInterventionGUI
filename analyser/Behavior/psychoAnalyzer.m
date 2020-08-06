@@ -54,6 +54,26 @@ function psychoAnalyzer_OpeningFcn(hObject, eventdata, handles, varargin)
 % Choose default command line output for psychoAnalyzer
 handles.output = hObject;
 
+axes(handles.axesSubject);
+quiver(0,-5,0,5,'-k','LineWidth',3);
+% plot([0 0],[-5 0],'-k','LineWidth',3);
+hold on
+xlim([-6 6]);
+ylim([-5 7]);
+
+x = [-3 -3 -3 -3];
+y = [4 4 4 4];
+u = [3 4 5 4];
+v = [-4 -3 0 3];
+
+quiver(x,y,u,v,'-.','color',[0.1 0.1 0.65 0.5],'LineWidth',2);
+
+x = [3 3 3 3];
+y = [4 4 4 4];
+u = [-3 -4 -5 -4];
+v = [-4 -3 0 3];
+quiver(x,y,u,v,'-.','color',[0.65 0.1 0.1 0.5],'LineWidth',2);
+hold off
 % Update handles structure
 guidata(hObject, handles);
 
@@ -91,15 +111,18 @@ subjectName = get(handles.subjectName,'String');
 subjectI = get(handles.subjectName,'Value');
 subjectTime = get(handles.subjectTime,'String');
 timeI = get(handles.subjectTime,'Value');
-fileNameSub = string(strjoin([subjectName(subjectI),subjectTime(timeI)]));
+fileNameSub = string(strjoin([subjectName(subjectI),'_',subjectTime(timeI)]));
 fileNameSub = strrep(fileNameSub,' ','');
 
 if ~isempty(dataPath) && ~isempty(fileNameSub)
-    edfFilesIndex = dir(fullfile(dataPath,'*.edf')); % search .edf files
-    for i = 1:length(edfFilesIndex)
-        fileIndex = contains(edfFilesIndex(i).name,fileNameSub,'IgnoreCase',true); % search for subject name and time
+    matFilesIndex = dir(fullfile(dataPath,'*.mat')); % search .mat files
+    for i = 1:length(matFilesIndex)
+        if contains(matFilesIndex(i).name,'Converted_') % ignore eyelink data
+            continue
+        end
+        fileIndex = contains(matFilesIndex(i).name,fileNameSub,'IgnoreCase',true); % search for subject name and time
         if fileIndex
-            fileName = edfFilesIndex(i).name;
+            fileName = matFilesIndex(i).name;
             break
         end
     end
@@ -107,12 +130,16 @@ end
 
 P_right = [];
 
-if ~isempty(fileName)
-    subjInfo = load(fullfile(dataPath,strrep(fileName,'.edf','.mat')));
-    unique_time = unique(subjInfo.time);
-    unique_time(unique_time==0)==[];
-    unique_head = unique(subjInfo.head);
-    unique_head(unique_head==0)=[];
+if exist('fileName','Var') && ~isempty(fileName)
+    subjInfo = load(fullfile(dataPath,fileName));
+    unique_time = unique(subjInfo.TRIALINFO.time);
+    unique_degree = unique(subjInfo.TRIALINFO.degree);
+    headV = subjInfo.TRIALINFO.headingVelocity;
+    carV = subjInfo.TRIALINFO.carVelocity;
+    initialSide = subjInfo.TRIALINFO.initialSide;
+    carInitialDeg = subjInfo.TRIALINFO.carInitialDeg;
+    
+    %%
     
     
     head_times = length(subjInfo.head) ./ length(unique_head);
@@ -245,22 +272,25 @@ subjectName = cellstr(get(handles.subjectName,'String'));
 subjectNameI = get(handles.subjectName,'Value');
 dataPath = get(handles.dataPath,'String');
 subjectTime = {};
-edfFiles = {};
+matFiles = {};
 if ~isempty(dataPath)
-    edfFilesIndex = dir(fullfile(dataPath,'*.edf')); % search .edf files
-    subjectIndex = zeros(1,length(edfFilesIndex));
-    for i = 1:length(edfFilesIndex)
-        subjectIndex(i) = contains(edfFilesIndex(i).name,subjectName(subjectNameI),'IgnoreCase',true); % search for subject
+    matFilesIndex = dir(fullfile(dataPath,'*.mat')); % search .mat files
+    subjectIndex = zeros(1,length(matFilesIndex));
+    for i = 1:length(matFilesIndex)
+        if contains(matFilesIndex(i).name,'Converted_')
+            continue
+        end
+        subjectIndex(i) = contains(matFilesIndex(i).name,subjectName(subjectNameI),'IgnoreCase',true); % search for subject
     end
     for i = 1:length(subjectIndex)
         if subjectIndex(i)
-            edfFiles = cat(1,edfFiles,edfFilesIndex(i).name); % filter the file names from subject
+            matFiles = cat(1,matFiles,matFilesIndex(i).name); % filter the file names from subject
         end
     end
-    for i = 1:length(edfFiles)
-        subjecTimeIs = regexp(edfFiles{i},'\d*');
-        subjectTimeIe = regexp(edfFiles{i},'.edf')-1;
-        subjectTimeI = edfFiles{i}(subjecTimeIs:subjectTimeIe);
+    for i = 1:length(matFiles)
+        subjecTimeIs = regexp(matFiles{i},'\d*');
+        subjectTimeIe = regexp(matFiles{i},'.mat')-1;
+        subjectTimeI = matFiles{i}(subjecTimeIs(end):subjectTimeIe);
         subjectTime = cat(1,subjectTime,subjectTimeI); % search for times
     end
 end
@@ -314,16 +344,19 @@ function readData_Callback(hObject, eventdata, handles)
 dataPath = get(handles.dataPath,'String');
 subjectName = {};
 if ~isempty(dataPath)
-    if contains(dataPath,'.edf')
-        edfFiles = dir(dataPath);
+    if contains(dataPath,'.mat')
+        matFiles = dir(dataPath);
     else
-        edfFiles = dir(fullfile(dataPath,'*.edf')); % search edf files
+        matFiles = dir(fullfile(dataPath,'*.mat')); % search edf files
     end
     
-    for i = 1:length(edfFiles)
-        subjectNameIs = regexp(edfFiles(i).name,'3DEI_')+5;
-        subjectNameIe = regexp(edfFiles(i).name,'\d*')-1;
-        subjectNameI = edfFiles(i).name(subjectNameIs:subjectNameIe);
+    for i = 1:length(matFiles)
+        if contains(matFiles(i).name,'Converted_')
+            continue
+        end
+        subjectNameIs = regexp(matFiles(i).name,'3DEI_')+5;
+        subjectNameIe = regexp(matFiles(i).name,'\d*')-2;
+        subjectNameI = matFiles(i).name(subjectNameIs:subjectNameIe(end));
         subjectName = cat(1,subjectName,subjectNameI); % filtering subjects name
     end
 end
