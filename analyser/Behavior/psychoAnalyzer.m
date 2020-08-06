@@ -55,25 +55,28 @@ function psychoAnalyzer_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.output = hObject;
 
 axes(handles.axesSubject);
-quiver(0,-5,0,5,'-k','LineWidth',3);
-% plot([0 0],[-5 0],'-k','LineWidth',3);
-hold on
+plot([0 0],[-0 0],'-k','LineWidth',3);
 xlim([-6 6]);
 ylim([-5 7]);
+[xa,ya] = ds2nfu([0 0],[-5 0]);
+annotation('arrow',xa,ya);
+axis off
+% quiver(0,-5,0,5,'-k','LineWidth',3);
+% hold on
 
-x = [-3 -3 -3 -3];
-y = [4 4 4 4];
-u = [3 4 5 4];
-v = [-4 -3 0 3];
+% x = [-3 -3 -3 -3];
+% y = [4 4 4 4];
+% u = [3 4 5 4];
+% v = [-4 -3 0 3];
+% quiver(x,y,u,v,'-.','color',[0.1 0.1 0.65 0.5],'LineWidth',2);
+% 
+% x = [3 3 3 3];
+% y = [4 4 4 4];
+% u = [-3 -4 -5 -4];
+% v = [-4 -3 0 3];
+% quiver(x,y,u,v,'-.','color',[0.65 0.1 0.1 0.5],'LineWidth',2);
+% hold off
 
-quiver(x,y,u,v,'-.','color',[0.1 0.1 0.65 0.5],'LineWidth',2);
-
-x = [3 3 3 3];
-y = [4 4 4 4];
-u = [-3 -4 -5 -4];
-v = [-4 -3 0 3];
-quiver(x,y,u,v,'-.','color',[0.65 0.1 0.1 0.5],'LineWidth',2);
-hold off
 % Update handles structure
 guidata(hObject, handles);
 
@@ -104,6 +107,7 @@ function pushbutton1_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 axes(handles.axesSubject);
 cla;
+delete(findall(gcf,'type','annotation'));
 clear subjInfo
 dataPath = get(handles.dataPath,'String');
 
@@ -128,47 +132,45 @@ if ~isempty(dataPath) && ~isempty(fileNameSub)
     end
 end
 
-P_right = [];
-
 if exist('fileName','Var') && ~isempty(fileName)
     subjInfo = load(fullfile(dataPath,fileName));
-    unique_time = unique(subjInfo.TRIALINFO.time);
-    unique_degree = unique(subjInfo.TRIALINFO.degree);
+    time = unique(subjInfo.TRIALINFO.time);
+    degree = unique(subjInfo.TRIALINFO.degree);
     headV = subjInfo.TRIALINFO.headingVelocity;
     carV = subjInfo.TRIALINFO.carVelocity;
     initialSide = subjInfo.TRIALINFO.initialSide;
     carInitialDeg = subjInfo.TRIALINFO.carInitialDeg;
     
     %%
-    
-    
-    head_times = length(subjInfo.head) ./ length(unique_head);
-    
-    for j = 1 : length(unique_head)
-%         if j == 1 || j == length(unique_head)
-%             P_right = cat(2,P_right,sum(trialInfo.choice(trialInfo.head == unique_head(j))) ./ head_times_PC);
-%         else
-            P_right = cat(2,P_right,sum(subjInfo.choice(subjInfo.head == unique_head(j))-1) ./ head_times);
-%         end
+    minY = -headV.*time;
+    maxY = max(cosd(2*carInitialDeg)*-minY,max(sind(-degree)).*carV.*time+cosd(2*carInitialDeg)*-minY);
+    limX = max(-minY*sind(2*carInitialDeg),max(abs(-minY*sind(2*carInitialDeg)-cosd(degree).*carV.*time)));
+    limY = (maxY-minY)/2;
+    plot(0,0)
+    axis equal
+    if limX >= limY
+        maxY = maxY./limY.*limX;
+        minY = minY./limY.*limX;
+    else
+        limX = limY;
     end
-    fit_data = [unique_head',P_right',head_times * ones(length(unique_head),1)];
-
-%     [Bias,Threshold] = cum_gaussfit_max1(fit_data(2:end-1,:));
-    [Bias,Threshold] = cum_gaussfit_max1(fit_data(1:end,:));
-    xi = min(unique_head):0.1:max(unique_head);
-    y_fit = cum_gaussfit([Bias,Threshold],xi);
+    xlim([-limX,limX]);
+    ylim([minY,maxY]);
+    [headX,headY] = ds2nfu([0 0],[-headV.*time 0]);
+    annotation('arrow',headX,headY);
     
-    plot([0,0],[0,1],'-.k');
-    hold on
-    plot(unique_head,P_right,'*');
-    plot(xi,y_fit,'-');
-    set(gca, 'xlim',[-10,10])
-    xlabel('Heading degree');
-    ylabel('Proportion of "right" choice');
+    
+%     plot([0,0],[0,1],'-.k');
+%     hold on
+%     plot(unique_head,P_right,'*');
+%     plot(xi,y_fit,'-');
+%     set(gca, 'xlim',[-10,10])
+%     xlabel('Heading degree');
+%     ylabel('Proportion of "right" choice');
 %     hleg1=legend('choice','mean & standard error','linear result');
 %     set(hleg1,'Location','EastOutside')
-    text(-9,0.8,sprintf('\\it\\mu_{psy} = \\rm%6.3g\\circ',Bias),'color','b')
-    text(-9,0.7,sprintf('\\it\\sigma_{psy} = \\rm%6.3g\\circ', Threshold),'color','b')
+%     text(-9,0.8,sprintf('\\it\\mu_{psy} = \\rm%6.3g\\circ',Bias),'color','b')
+%     text(-9,0.7,sprintf('\\it\\sigma_{psy} = \\rm%6.3g\\circ', Threshold),'color','b')
 end
 
 
@@ -297,6 +299,10 @@ end
 if ~isempty(subjectTime)
     set(handles.subjectTime,'Value',1); % reset the value
     set(handles.subjectTime,'string',subjectTime); % output the times
+    if length(subjectTime)==1
+        subjectTime_Callback(hObject, eventdata, handles)
+    end
+
 end
 
 
@@ -318,6 +324,75 @@ function subjectTime_Callback(hObject, eventdata, handles)
 % hObject    handle to subjectTime (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+axes(handles.axesSubject);
+cla;
+delete(findall(gcf,'type','annotation'));
+clear subjInfo
+dataPath = get(handles.dataPath,'String');
+
+subjectName = get(handles.subjectName,'String');
+subjectI = get(handles.subjectName,'Value');
+subjectTime = get(handles.subjectTime,'String');
+timeI = get(handles.subjectTime,'Value');
+fileNameSub = string(strjoin([subjectName(subjectI),'_',subjectTime(timeI)]));
+fileNameSub = strrep(fileNameSub,' ','');
+
+if ~isempty(dataPath) && ~isempty(fileNameSub)
+    matFilesIndex = dir(fullfile(dataPath,'*.mat')); % search .mat files
+    for i = 1:length(matFilesIndex)
+        if contains(matFilesIndex(i).name,'Converted_') % ignore eyelink data
+            continue
+        end
+        fileIndex = contains(matFilesIndex(i).name,fileNameSub,'IgnoreCase',true); % search for subject name and time
+        if fileIndex
+            fileName = matFilesIndex(i).name;
+            break
+        end
+    end
+end
+
+if exist('fileName','Var') && ~isempty(fileName)
+    subjInfo = load(fullfile(dataPath,fileName));
+    time = unique(subjInfo.TRIALINFO.time);
+    degree = unique(subjInfo.TRIALINFO.degree);
+    headV = subjInfo.TRIALINFO.headingVelocity;
+    carV = subjInfo.TRIALINFO.carVelocity;
+    initialSide = subjInfo.TRIALINFO.initialSide;
+    carInitialDeg = subjInfo.TRIALINFO.carInitialDeg;
+    
+    %%
+    minY = -headV.*time;
+    maxY = max(cosd(2*carInitialDeg)*-minY,max(sind(-degree)).*carV.*time+cosd(2*carInitialDeg)*-minY);
+    limX = max(-minY*sind(2*carInitialDeg),max(abs(-minY*sind(2*carInitialDeg)-cosd(degree).*carV.*time)));
+    limY = (maxY-minY)/2;
+    plot(0,0)
+    hold on
+    axis equal
+    if limX >= limY
+        maxY = maxY./limY.*limX;
+        minY = minY./limY.*limX;
+    else
+        limX = limY;
+    end
+    xlim([-limX,limX]);
+    ylim([minY,maxY]);
+    [headX,headY] = ds2nfu([0 0],[-headV.*time 0]);
+    annotation('arrow',headX,headY,'Color',[0 0 0],'LineWidth',3);
+    
+    carIniP = headV*time.*[sind(2*carInitialDeg),cosd(2*carInitialDeg)];
+    
+    for j = 1:length(initialSide)
+        for i = 1:length(degree)
+            carSPX = carIniP(1)-cosd(degree(i)).*time.*carV;
+            carSPY = carIniP(2)-sind(degree(i)).*time.*carV;
+            [carX,carY] = ds2nfu([carIniP(1)*initialSide(j),carSPX*initialSide(j)],[carIniP(2),carSPY]);
+            h=annotation('arrow',carX,carY,'color',[0.5+0.3*initialSide(j),0.2,0.5-0.3*initialSide(j)]);
+            h.LineWidth=2;
+            h.LineStyle = '--';
+        end
+    end
+    axis off
+end
 
 % Hints: contents = cellstr(get(hObject,'String')) returns subjectTime contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from subjectTime
