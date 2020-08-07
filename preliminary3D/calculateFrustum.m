@@ -4,7 +4,8 @@ global FRUSTUM;
 global SCREEN;
 
 FRUSTUM.clipNear = 1; % cm
-FRUSTUM.clipFar = (cosd(min(TRIALINFO.carInitialDeg*2))+1).*max(TRIALINFO.time.*TRIALINFO.headingVelocity); % cm
+FRUSTUM.clipFar = max((cosd(TRIALINFO.carInitialDeg*2)+1).*TRIALINFO.time.*TRIALINFO.headingVelocity,...
+    (cosd(TRIALINFO.carInitialDeg*2)+1).*TRIALINFO.time.*TRIALINFO.headingVelocity+max(1-sind(TRIALINFO.degree)).*TRIALINFO.time.*TRIALINFO.carVelocity); % cm
 
 FRUSTUM.top = (FRUSTUM.clipNear / SCREEN.distance) * (SCREEN.heightCM / 2.0);
 FRUSTUM.bottom = (FRUSTUM.clipNear / SCREEN.distance) * (-SCREEN.heightCM / 2.0);

@@ -291,9 +291,9 @@ clear STARFIELD
 global TRIALINFO;
 global CAMERA;
 global STARFIELD;
-global STARDATA;
+% global STARDATA;
 global SCREEN;
-global FRUSTUM;
+% global FRUSTUM;
 
 subjectName = get(handles.subjectName,'String');
 subjectName = strrep(subjectName,' ',''); % delete blank space
@@ -308,7 +308,7 @@ curDir = pwd;
 TRIALINFO.degree= str2num(get(handles.degree,'String')); % right: positive; left: negative
 TRIALINFO.pupilAdaptionTime = str2double(get(handles.pupilAdaptionTime,'String'));
 TRIALINFO.lifeTime = str2double(get(handles.lifeTime,'String'));
-TRIALINFO.carVelocity = str2num(get(handles.carVelocity,'String'));%% m/s
+TRIALINFO.carVelocity = str2num(get(handles.carVelocity,'String'));%% cm/s
 TRIALINFO.headingVelocity = str2num(get(handles.headingVelocity,'String'));
 TRIALINFO.coherence = str2double(get(handles.coherence,'String'));
 TRIALINFO.time = str2num(get(handles.moveTime,'String')); % need to notice the FPS
@@ -339,22 +339,11 @@ if TRIALINFO.eyelinkRecording
     TRIALINFO.fixationWindow = str2double(get(handles.fixationWindow,'String'));%% eyeWindow set + - 2бу
     TRIALINFO.fixationThreshold = str2double(get(handles.fixationThreshold,'String')); %% chosen when fix on 0.2s = 200ms
     
-    % break options
-    TRIALINFO.trialBreak = get(handles.trialBreak,'Value');
-    TRIALINFO.checkWindowDegree = str2double(get(handles.checkWindow,'String'));
-    
     % auto-calibration options
     TRIALINFO.calibration = get(handles.calibration,'Value');
-    TRIALINFO.calibrationInterval = str2double(get(handles.calibrationInterval,'String')) * 60; % minutes to seconds
-    
-    % choicing method
-    TRIALINFO.handle = get(handles.handle,'Value');
-    TRIALINFO.gazePosition = get(handles.gazePosition,'Value');
+    TRIALINFO.calibrationInterval = str2double(get(handles.calibrationInterval,'String')); % minutes
 else
-    TRIALINFO.trialBreak = 0;
     TRIALINFO.calibration = 0;
-    TRIALINFO.handle = 1;
-    TRIALINFO.gazePosition = 0;
 end
 
 dataPath = get(handles.dataPath,'String');
@@ -391,11 +380,11 @@ TRIALINFO.fixationPeriod = 0.5; % second
 TRIALINFO.intertrialInterval = 1; % second
 
 % parameters for the star field
-STARFIELD.dimensionX = 400;  % cm
-STARFIELD.dimensionY = 5;  % cm
-STARFIELD.dimensionZ = 3000;  % cm
+STARFIELD.dimensionX = 1000;  % cm
+STARFIELD.dimensionY = 10;  % cm
+STARFIELD.dimensionZ = 1500;  % cm
 STARFIELD.starSize = 0.1;    % degree
-STARFIELD.density = 1000/100^3;    % convert num/m^3 to num/cm^3
+STARFIELD.density = 300/100^3;    % convert num/m^3 to num/cm^3
 
 STARFIELD.probability = TRIALINFO.coherence;
 
@@ -500,7 +489,7 @@ if TRIALINFO.eyelinkRecording
     
     triali = Eyelink('Openfile', tempName);
     if triali~=0
-        fprintf('Cannot create EDF file ''%s'' ', fileName);
+        fprintf('Cannot create EDF file ''%s'' ', tempName);
         cleanup;
         Eyelink('ShutDown');
         Screen('CloseAll');
@@ -555,6 +544,7 @@ end
 Screen('FillRect', win ,blackBackground,[0 0 SCREEN.widthPix SCREEN.heightPix]);
 Screen('Flip', win,0,0);
 
+SetMouse(0,0);
 HideCursor(SCREEN.screenId);
 
 %% pupil adapting
@@ -590,16 +580,15 @@ result = nan(trialNum,3); % clash(true/false) / 0 no choice, 1 speedup, 2 brake
 breakFlag = false;
 for triali = 1:trialNum
     trialInterval = tic;
-    SetMouse(0,0);
     [ ~, ~, keyCode] = KbCheck;
     if keyCode(escape)
         break;
     end
-    
+    chosen = false;
     if TRIALINFO.eyelinkRecording
         % auto-calibration
         if TRIALINFO.calibration
-            if toc(calibrateCkeck) >= TRIALINFO.calibrationInterval
+            if toc(calibrateCkeck) >= TRIALINFO.calibrationInterval*60 % min to sec
                 EyelinkDoTrackerSetup(el);
                 EyelinkDoDriftCorrection(el);
                 Eyelink('StartRecording');
@@ -648,10 +637,11 @@ for triali = 1:trialNum
         adjustDeviation(pageUp,pageDown,deviationAdjust);
         
         [ keyDown, ~, keyCode] = KbCheck;
-        if keyDown
+        if keyDown && ~chosen
             if keyCode(upKey)
                 keyPress = 1;
                 speed = 3;
+                chosen = true;
                 choiceTime(triali) = toc(trialST);
                 if TRIALINFO.eyelinkRecording
                     Eyelink('message', ['Choice made as speedup 1 in trial ' num2str(triali)]);
@@ -660,15 +650,16 @@ for triali = 1:trialNum
             if keyCode(downKey)
                 keyPress = 2; 
                 speed = 3;
+                chosen = true;
                 choiceTime(triali) = toc(trialST);
                 if TRIALINFO.eyelinkRecording
                     Eyelink('message', ['Choice made as brake 2 in trial ' num2str(triali)]);
                 end
             end
-            if keyCode(escape)
-                breakFlag = true;
-                break
-            end
+        end
+        if keyCode(escape)
+            breakFlag = true;
+            break
         end
         
         if framei+speed <= frameNum
@@ -719,16 +710,17 @@ for triali = 1:trialNum
         end
     end
     %% feedback
-    result(triali,:) = [clash,keyPress,choiceTime];
+    result(triali,:) = [clash,keyPress,choiceTime(triali) ];
     Conditions(triali,:) = conditioni;
     
     drawBinocularScene(win,cameraP,pi,framei,carP);    
     drawFixation(SCREEN.centre,TRIALINFO.fixationSize,win);
-    
-    if clash
-        [~, ~, ~] = DrawFormattedText(win, 'CLASH!!','center',SCREEN.centre(2)/2,[200 20 20]);
-    else
-        [~, ~, ~] = DrawFormattedText(win, 'Safe','center',SCREEN.centre(2)/2,[20 200 20]);
+    if TRIALINFO.feedback
+        if clash
+            [~, ~, ~] = DrawFormattedText(win, 'CLASH!!','center',SCREEN.centre(2)/2,[200 20 20]);
+        else
+            [~, ~, ~] = DrawFormattedText(win, 'Safe','center',SCREEN.centre(2)/2,[20 200 20]);
+        end
     end
     Screen('TextBackgroundColor',win, [0 0 0 0]);
     Screen('DrawingFinished',win);
@@ -745,7 +737,7 @@ if TRIALINFO.eyelinkRecording
     Eyelink('CloseFile');
     try
         fprintf('Receiving data file ''%s''\n',fileName);
-        status=Eyelink('ReceiveFile',tempName ,saveDir,1);
+        status=Eyelink('ReceiveFile',tempName ,TRIALINFO.dataPath,1);
         if status > 0
             fprintf('ReceiveFile status %d\n ', status);
         end
@@ -756,9 +748,9 @@ if TRIALINFO.eyelinkRecording
         fprintf('Problem receiving data file ''%s''\n',fileName);
     end
     
-    cd (saveDir);
-    save(fullfile(saveDir,fileName));
-    movefile([saveDir,'\',tempName,'.edf'],[saveDir,'\',fileName,'.edf']);
+    cd (TRIALINFO.dataPath);
+    save(fullfile(TRIALINFO.dataPath,tempName));
+    movefile(fullfile(TRIALINFO.dataPath,[tempName '.edf']),fullfile(TRIALINFO.dataPath,[fileName,'.edf']));
     
     % shut down the eyelink
     Eyelink('ShutDown');
@@ -1115,16 +1107,11 @@ if ~isempty(logFile)
             
             if TRIALINFO.eyelinkRecording
                 if TRIALINFO.eyelinkRecording
-                    set(handles.trialBreak,'Value',TRIALINFO.trialBreak);
-                    set(handles.checkWindow,'String',num2str(TRIALINFO.checkWindowDegree));
                     set(handles.calibration,'Value',TRIALINFO.calibration);
                     set(handles.calibrationInterval,'String',num2str(TRIALINFO.calibrationInterval));
                     
                     set(handles.fixationWindow,'String',num2str(TRIALINFO.fixationWindow));
                     set(handles.fixationThreshold,'String',num2str(TRIALINFO.fixationThreshold));
-                    
-                    set(handles.handle,'Value',TRIALINFO.handle);
-                    set(handles.gazePosition,'Value',TRIALINFO.gazePosition);
                 end
             end
         end
