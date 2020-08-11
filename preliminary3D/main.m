@@ -578,7 +578,9 @@ choiceTime = nan(trialNum,1);
 Conditions = nan(trialNum,3);
 result = nan(trialNum,3); % clash(true/false) / 0 no choice, 1 speedup, 2 brake
 breakFlag = false;
-for triali = 1:trialNum
+triali = 1;
+while triali <= trialNum
+    fixationFlag = true;
     trialInterval = tic;
     [ ~, ~, keyCode] = KbCheck;
     if keyCode(escape)
@@ -633,6 +635,7 @@ for triali = 1:trialNum
     clash = false;
     speed = 1;
     trialST = tic;
+    % start frames
     while true
         adjustDeviation(pageUp,pageDown,deviationAdjust);
         
@@ -693,6 +696,23 @@ for triali = 1:trialNum
         
         Screen('Flip', win, 0, 0);
         
+        if TRIALINFO.eyelinkRecording
+            if flamei == 1
+                breakFlag = fixationCheck(SCREEN.centre,degree2pix(TRIALINFO.fixationWindow),TRIALINFO.fixationThreshold,escape,skipKey,cKey,el);
+            else
+                evt = Eyelink( 'NewestFloatSample');
+                eyeUsed = Eyelink('EyeAvailable'); % get eye that's tracked
+                if eyeUsed ~= -1 % do we know which eye to use yet?
+                    px =evt.gx(eyeUsed+1); % +1 as we're accessing MATLAB array
+                    py = evt.gy(eyeUsed+1);
+                    % frameStartTime(i) = evt.time;
+                end
+                if abs((SCREEN.centre(1) - px) + (SCREEN.centre(2) - py)*1i > degree2pix(TRIALINFO.fixationWindow))
+                    fixationFlag = false;
+                    break
+                end
+            end
+        end
         if clash
             if TRIALINFO.eyelinkRecording
                 Eyelink('message', ['Car clashed in trial ' num2str(triali)]);
@@ -700,7 +720,9 @@ for triali = 1:trialNum
             break
         end
     end
-    
+    if ~fixationFlag
+        continue
+    end
     if breakFlag
         break;
     end
@@ -717,7 +739,7 @@ for triali = 1:trialNum
     drawFixation(SCREEN.centre,TRIALINFO.fixationSize,win);
     if TRIALINFO.feedback
         if clash
-            [~, ~, ~] = DrawFormattedText(win, 'CLASH!!','center',SCREEN.centre(2)/2,[200 20 20]);
+            [~, ~, ~] = DrawFormattedText(win, 'CRASH!!','center',SCREEN.centre(2)/2,[200 20 20]);
         else
             [~, ~, ~] = DrawFormattedText(win, 'Safe','center',SCREEN.centre(2)/2,[20 200 20]);
         end
@@ -728,6 +750,8 @@ for triali = 1:trialNum
     if TRIALINFO.eyelinkRecording
         Eyelink('message', ['Feedback given in trial ' num2str(triali)]);
     end
+    
+    triali = triali+1;
 end
 
 Screen('Flip', win);
