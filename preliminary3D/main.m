@@ -697,7 +697,7 @@ while triali <= trialNum
         Screen('Flip', win, 0, 0);
         
         if TRIALINFO.eyelinkRecording
-            if flamei == 1
+            if framei == 1
                 breakFlag = fixationCheck(SCREEN.centre,degree2pix(TRIALINFO.fixationWindow),TRIALINFO.fixationThreshold,escape,skipKey,cKey,el);
             else
                 evt = Eyelink( 'NewestFloatSample');
