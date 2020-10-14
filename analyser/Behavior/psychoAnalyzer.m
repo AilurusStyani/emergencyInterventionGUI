@@ -142,35 +142,35 @@ if exist('fileName','Var') && ~isempty(fileName)
     carInitialDeg = subjInfo.TRIALINFO.carInitialDeg;
     
     %%
-    minY = -headV.*time;
-    maxY = max(cosd(2*carInitialDeg)*-minY,max(sind(-degree)).*carV.*time+cosd(2*carInitialDeg)*-minY);
-    limX = max(-minY*sind(2*carInitialDeg),max(abs(-minY*sind(2*carInitialDeg)-cosd(degree).*carV.*time)));
-    limY = (maxY-minY)/2;
-    plot(0,0)
-    axis equal
-    if limX >= limY
-        maxY = maxY./limY.*limX;
-        minY = minY./limY.*limX;
-    else
-        limX = limY;
-    end
-    xlim([-limX,limX]);
-    ylim([minY,maxY]);
-    [headX,headY] = ds2nfu([0 0],[-headV.*time 0]);
-    annotation('arrow',headX,headY);
+%     minY = -headV.*time;
+%     maxY = max(cosd(2*carInitialDeg)*-minY,max(sind(-degree)).*carV.*time+cosd(2*carInitialDeg)*-minY);
+%     limX = max(-minY*sind(2*carInitialDeg),max(abs(-minY*sind(2*carInitialDeg)-cosd(degree).*carV.*time)));
+%     limY = (maxY-minY)/2;
+%     plot(0,0)
+%     axis equal
+%     if limX >= limY
+%         maxY = maxY./limY.*limX;
+%         minY = minY./limY.*limX;
+%     else
+%         limX = limY;
+%     end
+%     xlim([-limX,limX]);
+%     ylim([minY,maxY]);
+%     [headX,headY] = ds2nfu([0 0],[-headV.*time 0]);
+%     annotation('arrow',headX,headY);
     
-    
-%     plot([0,0],[0,1],'-.k');
-%     hold on
-%     plot(unique_head,P_right,'*');
-%     plot(xi,y_fit,'-');
-%     set(gca, 'xlim',[-10,10])
-%     xlabel('Heading degree');
-%     ylabel('Proportion of "right" choice');
-%     hleg1=legend('choice','mean & standard error','linear result');
-%     set(hleg1,'Location','EastOutside')
-%     text(-9,0.8,sprintf('\\it\\mu_{psy} = \\rm%6.3g\\circ',Bias),'color','b')
-%     text(-9,0.7,sprintf('\\it\\sigma_{psy} = \\rm%6.3g\\circ', Threshold),'color','b')
+    figure(1)
+    plot([0,0],[0,1],'-.k');
+    hold on
+    plot(unique_head,P_right,'*');
+    plot(xi,y_fit,'-');
+    set(gca, 'xlim',[-10,10])
+    xlabel('Heading degree');
+    ylabel('Proportion of "right" choice');
+    hleg1=legend('choice','mean & standard error','linear result');
+    set(hleg1,'Location','EastOutside')
+    text(-9,0.8,sprintf('\\it\\mu_{psy} = \\rm%6.3g\\circ',Bias),'color','b')
+    text(-9,0.7,sprintf('\\it\\sigma_{psy} = \\rm%6.3g\\circ', Threshold),'color','b')
 end
 
 
@@ -302,7 +302,6 @@ if ~isempty(subjectTime)
     if length(subjectTime)==1
         subjectTime_Callback(hObject, eventdata, handles)
     end
-
 end
 
 
@@ -359,6 +358,8 @@ if exist('fileName','Var') && ~isempty(fileName)
     carV = subjInfo.TRIALINFO.carVelocity;
     initialSide = subjInfo.TRIALINFO.initialSide;
     carInitialDeg = subjInfo.TRIALINFO.carInitialDeg;
+    Conditions = subjInfo.Conditions;
+    result = subjInfo.result;
     
     %%
     minY = -headV.*time;
@@ -389,6 +390,15 @@ if exist('fileName','Var') && ~isempty(fileName)
             h=annotation('arrow',carX,carY,'color',[0.5+0.3*initialSide(j),0.2,0.5-0.3*initialSide(j)]);
             h.LineWidth=2;
             h.LineStyle = '--';
+            
+            degTrial = and(Conditions(:,2)==initialSide(j), Conditions(:,3)==degree(i));
+            breakP = sum(result(degTrial,2) == 2) / sum(degTrial);
+            carSPX = carIniP(1)-cosd(degree(i)).*time.*carV*breakP;
+            carSPY = carIniP(2)-sind(degree(i)).*time.*carV*breakP;
+            [carX,carY] = ds2nfu([carIniP(1)*initialSide(j),carSPX*initialSide(j)],[carIniP(2),carSPY]);
+            h1=annotation('arrow',carX,carY,'color',[0.5+0.3*initialSide(j),0.2,0.5-0.3*initialSide(j)]);
+            h1.LineWidth=2;
+            h1.LineStyle = '-';
         end
     end
     axis off
@@ -426,13 +436,17 @@ if ~isempty(dataPath)
     end
     
     for i = 1:length(matFiles)
-        if contains(matFiles(i).name,'Converted_')
+        if ~contains(matFiles(i).name,'3DEI')
+            continue
+        elseif contains(matFiles(i).name,'Converted_')
             continue
         end
         subjectNameIs = regexp(matFiles(i).name,'3DEI_')+5;
         subjectNameIe = regexp(matFiles(i).name,'\d*')-2;
         subjectNameI = matFiles(i).name(subjectNameIs:subjectNameIe(end));
-        subjectName = cat(1,subjectName,subjectNameI); % filtering subjects name
+        if ~isempty(subjectNameI)
+            subjectName = cat(1,subjectName,subjectNameI); % filtering subjects name
+        end
     end
 end
 if ~isempty(subjectName)

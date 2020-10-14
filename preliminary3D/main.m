@@ -699,6 +699,7 @@ while triali <= trialNum
         if TRIALINFO.eyelinkRecording
             if framei == 1
                 breakFlag = fixationCheck(SCREEN.centre,degree2pix(TRIALINFO.fixationWindow),TRIALINFO.fixationThreshold,escape,skipKey,cKey,el);
+                trialST = tic;
             else
                 evt = Eyelink( 'NewestFloatSample');
                 eyeUsed = Eyelink('EyeAvailable'); % get eye that's tracked
