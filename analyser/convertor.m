@@ -156,6 +156,11 @@ function pushbutton1_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 filePath2 = get(handles.filePath2,'String');
+if exist(filePath2,'file') == 2
+    pathIsFile = true;
+else
+    pathIsFile = false;
+end
 
 if isempty(filePath2)
     filePath1 = get(handles.filePath1,'String');
@@ -172,7 +177,12 @@ if isempty(filePath2)
 else
     functionPath = pwd;
     try
-        cd(filePath2);
+        if ~pathIsFile
+            cd(filePath2);
+        else
+            file = dir(filePath2);
+            cd(file(1).folder);
+        end
         set(handles.pathLog2,'String','Start reading files.')
         set(handles.pathLog2,'ForegroundColor',[0.2 0.9 0]);
     catch
@@ -181,14 +191,35 @@ else
         return
     end
 end
-
-dataFile = dir(fullfile(filePath2,'Converted_*.mat'));
+if pathIsFile
+    dataFile = dir(filePath2);
+    if ~contains(dataFile.name,'.mat')
+        if contains(dataFile.name,'.edf')
+            dataFile.name = strrep(dataFile.name,'.edf','.mat');
+        else
+            set(handles.pathLog2,'String','Path error');
+            set(handles.pathLog2,'ForegroundColor',[1 0 0]);
+            return
+        end
+    end
+    if ~contains(dataFile.name,'Converted_')
+        dataFile = dir(fullfile(dataFile.folder,['Converted_' dataFile.name]));
+    end
+else
+    dirPath = pwd;
+    cd(filePath2);
+    dataFile = dir('Converted_*.mat');
+    cd(dirPath);
+end
 fileName = cell(length(dataFile),1);
 for i = 1:length(dataFile)
     fileName{i} = dataFile(i).name;
 end
 set(handles.fileList,'String',fileName)
 cd(functionPath);
+if pathIsFile
+    fileList_Callback(hObject, eventdata, handles);
+end
     
 
 % --- Executes on selection change in fileList.
@@ -216,13 +247,13 @@ else
     set(handles.pathLog2,'ForegroundColor',[0.2 0.9 0]);
 end
 
+clear data
 fileList = get(handles.fileList,'String');
 fileNum = get(handles.fileList,'Value');
-fileName = fullfile(filePath2,fileList{fileNum});
+file = dir(filePath2);
+fileName = fullfile(file(1).folder,fileList{fileNum});
 
-clear data
 data = load(fileName);
-
 if ~isempty(data.eyeData)
     figure(1)
     cla;
@@ -232,20 +263,20 @@ if ~isempty(data.eyeData)
     plot(data.eyeData(:,3),'g');
     plot(data.eyeData(:,4),'b');
     
-    if ~isempty(data.stimulusOnset)
-        soIndex = ones(length(data.stimulusOnset(:,1)),1);
-        for i = 1:length(data.stimulusOnset(:,1))
-            soIndex(i) = find(data.stimulusOnset(i,1) <= data.eyeData(:,1),1);
+    if ~isempty(data.trialStart)
+        stIndex = ones(length(data.trialStart(:,1)),1);
+        for i = 1:length(data.trialStart(:,1))
+            stIndex(i) = find(data.trialStart(i,1) <= data.eyeData(:,1),1);
         end
-        plot([soIndex soIndex],[0 8000],'--m');
+        plot([stIndex stIndex],[0 8000],'--m');
     end
     
-    if ~isempty(data.stimulusTerm)
-        stIndex = ones(length(data.stimulusTerm(:,1)),1);
-        for i = 1:length(data.stimulusTerm(:,1))
-            stIndex(i) = find(data.stimulusTerm(i,1) <= data.eyeData(:,1),1);
+    if ~isempty(data.choiceMade)
+        fbIndex = ones(length(data.choiceMade(:,1)),1);
+        for i = 1:length(data.choiceMade(:,1))
+            fbIndex(i) = find(data.choiceMade(i,1) <= data.eyeData(:,1),1);
         end
-        plot([stIndex stIndex],[0 8000],'--k');
+        plot([fbIndex fbIndex],[0 8000],'--k');
     end
 else
     set(handles.pathLog2,'String','No eye data in this file.');
@@ -255,31 +286,65 @@ end
 logFile = strrep(fileName,'Converted_','');
 log = load(logFile);
 
-st{1} = data.movingStart(:,1);
-ed{1} = data.startChoice(:,1);
+st{1} = data.trialStart(:,1);
+ed{1} = data.feedback(:,1);
 
-st{2} = data.clockClick(:,1)-500;
-ed{2} = data.clockClick(:,1)+500;
+lSt = length(st{1});
+lEd = length(ed{1});
+if lSt>lEd
+    st{1} = st{1}(1:lEd);
+elseif lEd>lSt
+    ed{1} = ed{1}(1:lSt);
+end
+    
+st{2} = data.trialStart(:,1)-200;
+ed{2} = data.trialStart(:,1)+700;
 
-st{3} = data.movingStart(:,1)+log.clockTime(1:size(data.movingStart,1))'-500;
-ed{3} = data.movingStart(:,1)+log.clockTime(1:size(data.movingStart,1))'+500;
+% st{3} = data.movingStart(:,1)+log.clockTime(1:size(data.movingStart,1))'-500;
+% ed{3} = data.movingStart(:,1)+log.clockTime(1:size(data.movingStart,1))'+500;
+st{3} = data.choiceMade(:,1)-1000;
+ed{3} = data.choiceMade(:,1)+500;
 
-for i = 1:length(st)
+for i = 1:length(ed)
     figure(1+i);cgf
     hold off
     pupilSize = nan(max(ed{i}-st{i}),length(st{i}));
     for j = 1:length(st{i})
         sP = find(data.eyeData(:,1) >= st{i}(j),1);
-        if i == 1
-            basement = mean(data.eyeData(sP-100:sP,4));
-        end
+        basement = mean(data.eyeData(sP-100:sP,4));
         eP = find(data.eyeData(:,1) <= ed{i}(j),1,'last');
-        pupilSize(1:eP-sP+1,j) = (data.eyeData(sP:eP,4)-basement)/basement;
+        [purifiedPathData,~,errorflag,~] = BlinkNoisePurify_NaN(data.eyeData(sP:eP,:),1,[7 8 9 10],4);
+        if ismember(0,errorflag)
+            pupilSize(1:eP-sP+1,j) = (purifiedPathData(:,4)-basement)/basement;
+        else
+            pupilSize(1:eP-sP+1,j) = nan(eP-sP,1);
+        end
     end
-    pupilSize = pupilSize';
-    pMean = nanmean(pupilSize,1);
-    pSe = nanstd(pupilSize,1)./sqrt(sum(~isnan(pupilSize),1));
-    shadedErrorBar(1:size(pupilSize,2),pMean,pSe);
+    speedUpTrial = log.result(:,2) == 1;
+    brakeTrial = log.result(:,2) == 2;
+    
+    pupilSizeSU = pupilSize(:,speedUpTrial)';
+    pMeanSU = nanmean(pupilSizeSU,1);
+    pSeSU = nanstd(pupilSizeSU,1)./sqrt(sum(~isnan(pupilSizeSU),1));
+    shadedErrorBar(1:size(pupilSizeSU,2),pMeanSU,pSeSU,'lineprops', '-g');
+    hold on
+    
+    pupilSizeB = pupilSize(:,brakeTrial)';
+    pMeanB = nanmean(pupilSizeB,1);
+    pSeB = nanstd(pupilSizeB,1)./sqrt(sum(~isnan(pupilSizeB),1));
+    shadedErrorBar(1:size(pupilSizeB,2),pMeanB,pSeB,'lineprops', '-r');
+    
+    minPlot = min(min(pMeanB-pSeB*3),min(pMeanSU-pSeSU*3));
+    maxPlot = max(max(pMeanB+pSeB*3),max(pMeanSU+pSeSU*3));
+    if i == 1
+        title('During the trial');
+    elseif i == 2
+        title('In trial begining');
+        plot([200 200],[minPlot,maxPlot],'-.k');
+    elseif i == 3
+        title('During choice')
+        plot([1000 1000],[minPlot,maxPlot],'-.k');
+    end
 end
 
 
@@ -307,7 +372,7 @@ function pushbutton2_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 filePath1 = get(handles.filePath1,'String');
 edf2asc = get(handles.edf2asc,'Value');
-if exist(filePath1,'file') && contains(filePath1,'.edf')
+if exist(filePath1,'file')==2 && contains(filePath1,'.edf')
     pathIsFile = true;
 else
     pathIsFile = false;
@@ -368,11 +433,13 @@ end
 asc2mat = get(handles.asc2mat,'Value');
 if asc2mat
     if ~pathIsFile
+        cd(filePath1)
         ascFile = dir('*.asc');
         ascFileNum = length(ascFile);
     else
         ascFile = dir(strrep(filePath1,'.edf','.asc'));
         ascFileNum = length(ascFile);
+        cd(ascFile.folder);
     end
     
     wb2 = waitbar(0,'.ASC to .MAT in processing... 0%','CreateCancelBtn','closereq;return;');
@@ -391,91 +458,40 @@ if asc2mat
         fclose(fid);
         rawData=importdata(ascNamei,' ',numline);
         
-        foStr = rawData(contains(rawData,'fixation onset','IgnoreCase',true));
-        fixationOnset = nan(length(foStr),2);
-        for j = 1:length(foStr)
-            fixationOnset(j,:) = cell2mat(cellfun(@str2num,regexp(foStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
-        end
-        delIndex = diff(fixationOnset(:,2))==0;
-        fixationOnset(delIndex,:) = [];
-        
-        fdStr = rawData(contains(rawData,'fixation done','IgnoreCase',true));
-        fixationDone = nan(length(fdStr),2);
-        for j = 1:length(fdStr)
-            fixationDone(j,:) = cell2mat(cellfun(@str2num,regexp(fdStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
-        end
-        delIndex = diff(fixationDone(:,2))==0;
-        fixationDone(delIndex,:) = [];
-        
-        soStr = rawData(contains(rawData,'stimulus onset','IgnoreCase',true));
-        stimulusOnset = nan(length(soStr),2);
-        for j = 1:length(soStr)
-            stimulusOnset(j,:) = cell2mat(cellfun(@str2num,regexp(soStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
-        end
-        delIndex = diff(stimulusOnset(:,2))==0;
-        stimulusOnset(delIndex,:) = [];
-        
-        tbStr = rawData(contains(rawData,'trial break','IgnoreCase',true));
-        trialBreak = nan(length(tbStr),2);
-        for j = 1:length(tbStr)
-            trialBreak(j,:) = cell2mat(cellfun(@str2num,regexp(tbStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
-        end
-        trialBreak;
-        
-        stStr = rawData(contains(rawData,'stimulus term','IgnoreCase',true));
-        stimulusTerm = nan(length(stStr),2);
+        stStr = rawData(and(contains(rawData,'trial','IgnoreCase',true),contains(rawData,'start','IgnoreCase',true)));
+        trialStart = nan(length(stStr),2);
         for j = 1:length(stStr)
-            stimulusTerm(j,:) = cell2mat(cellfun(@str2num,regexp(stStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
+            trialStart(j,:) = cell2mat(cellfun(@str2num,regexp(stStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
         end
-        delIndex = diff(stimulusTerm(:,2))==0;
-        stimulusTerm(delIndex,:) = [];
+        delIndex = diff(trialStart(:,2))==0;
+        trialStart(delIndex,:) = [];
         
-        msStr = rawData(contains(rawData,'Moving start','IgnoreCase',true));
-        movingStart = nan(length(msStr),2);
-        for j = 1:length(msStr)
-            movingStart(j,:) = cell2mat(cellfun(@str2num,regexp(msStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
-        end
-        delIndex = diff(movingStart(:,2))==0;
-        movingStart(delIndex,:) = [];
         
-        scStr = rawData(contains(rawData,'start choice','IgnoreCase',true));
-        startChoice = nan(length(scStr),2);
-        for j = 1:length(scStr)
-            startChoice(j,:) = cell2mat(cellfun(@str2num,regexp(scStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
+        cmStr = rawData(contains(rawData,'Choice made','IgnoreCase',true));
+        choiceMade = nan(length(cmStr),3);
+        for j = 1:length(cmStr)
+             array = cell2mat(cellfun(@str2num,regexp(cmStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
+             if length(array) == 2
+                 array = [array(1) 0 array(2)];
+             end
+             choiceMade(j,:) = array;
         end
-        delIndex = diff(startChoice(:,2))==0;
-        startChoice(delIndex,:) = [];
+        delIndex = diff(choiceMade(:,3))==0;
+        choiceMade(delIndex,:) = [];
         
-        ccStr = rawData(contains(rawData,'clock click','IgnoreCase',true));
-        clockClick = nan(length(ccStr),2);
-        for j = 1:length(ccStr)
-            clockClick(j,:) = cell2mat(cellfun(@str2num,regexp(ccStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
+        fbStr = rawData(contains(rawData,'Feedback given','IgnoreCase',true));
+        feedback = nan(length(fbStr),2);
+        for j = 1:length(fbStr)
+            feedback(j,:) = cell2mat(cellfun(@str2num,regexp(fbStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
         end
-        delIndex = diff(clockClick(:,2))==0;
-        clockClick(delIndex,:) = [];
-        
-        dmStr = rawData(contains(rawData,'decision made','IgnoreCase',true));
-        decisionMade = nan(length(dmStr),3);
-        for j = 1:length(dmStr)
-            decisionMade(j,:) = cell2mat(cellfun(@str2num,regexp(dmStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
-        end
-        delIndex = diff(decisionMade(:,2))==0;
-        decisionMade(delIndex,:) = [];
-        
-        teStr = rawData(contains(rawData,'trial end','IgnoreCase',true));
-        trialEnd = nan(length(teStr),2);
-        for j = 1:length(teStr)
-            trialEnd(j,:) = cell2mat(cellfun(@str2num,regexp(teStr{j},'\d*\.?\d*','match'),'UniformOutput',false));
-        end
-        delIndex = diff(trialEnd(:,2))==0;
-        trialEnd(delIndex,:) = [];
+        delIndex = diff(feedback(:,2))==0;
+        feedback(delIndex,:) = [];
         
         eyeDataInd = contains(rawData,'...');
         eyeData = rawData(eyeDataInd);
         eyeData = cell2mat(cellfun(@str2num,strrep(eyeData,'...',''),'UniformOutput',false));
         
-        save(saveNamei,'eyeData','trialEnd','decisionMade','startChoice','stimulusTerm','trialBreak','stimulusOnset',...
-            'fixationDone','fixationOnset','clockClick','movingStart')
+        save(saveNamei,'eyeData','trialStart','choiceMade','feedback')
         
         waitbar(i/ascFileNum,wb2,['.ASC to .MAT in processing... ' num2str(i/ascFileNum*100) '%']);
     end
