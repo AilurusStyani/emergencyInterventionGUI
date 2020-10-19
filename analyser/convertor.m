@@ -313,7 +313,7 @@ for i = 1:length(ed)
         sP = find(data.eyeData(:,1) >= st{i}(j),1);
         basement = mean(data.eyeData(sP-100:sP,4));
         eP = find(data.eyeData(:,1) <= ed{i}(j),1,'last');
-        [purifiedPathData,~,errorflag,~] = BlinkNoisePurify_NaN(data.eyeData(sP:eP,:),1,[7 8 9 10],4);
+        [purifiedPathData,~,errorflag,~] = BlinkNoisePurify_NaN(data.eyeData(sP:eP,:),1,[3 7 8 9 10],4);
         if ismember(0,errorflag)
             pupilSize(1:eP-sP+1,j) = (purifiedPathData(:,4)-basement)/basement;
         else
@@ -328,11 +328,13 @@ for i = 1:length(ed)
     pSeSU = nanstd(pupilSizeSU,1)./sqrt(sum(~isnan(pupilSizeSU),1));
     shadedErrorBar(1:size(pupilSizeSU,2),pMeanSU,pSeSU,'lineprops', '-g');
     hold on
+    plot(pupilSizeSU','color',[0 1 0 0.5]);
     
     pupilSizeB = pupilSize(:,brakeTrial)';
     pMeanB = nanmean(pupilSizeB,1);
     pSeB = nanstd(pupilSizeB,1)./sqrt(sum(~isnan(pupilSizeB),1));
     shadedErrorBar(1:size(pupilSizeB,2),pMeanB,pSeB,'lineprops', '-r');
+    plot(pupilSizeB','color',[1 0 0 0.5]);
     
     minPlot = min(min(pMeanB-pSeB*3),min(pMeanSU-pSeSU*3));
     maxPlot = max(max(pMeanB+pSeB*3),max(pMeanSU+pSeSU*3));
