@@ -309,9 +309,9 @@ for i = 1:length(ed)
     figure(1+i);cgf
     hold off
     pupilSize = nan(max(ed{i}-st{i}),length(st{i}));
-    for j = 1:length(st{i})
+    for j = 1:length(st{i})-1
         sP = find(data.eyeData(:,1) >= st{i}(j),1);
-        basement = mean(data.eyeData(sP-100:sP,4));
+        basement = mean(data.eyeData(sP:sP+100,4));
         eP = find(data.eyeData(:,1) <= ed{i}(j),1,'last');
         [purifiedPathData,~,errorflag,~] = BlinkNoisePurify_NaN(data.eyeData(sP:eP,:),1,[3 7 8 9 10],4);
         if ismember(0,errorflag)
@@ -328,23 +328,58 @@ for i = 1:length(ed)
     pSeSU = nanstd(pupilSizeSU,1)./sqrt(sum(~isnan(pupilSizeSU),1));
     shadedErrorBar(1:size(pupilSizeSU,2),pMeanSU,pSeSU,'lineprops', '-g');
     hold on
-    plot(pupilSizeSU','color',[0 1 0 0.5]);
+    plot(pupilSizeSU','color',[0 1 0 0.25]);
     
     pupilSizeB = pupilSize(:,brakeTrial)';
     pMeanB = nanmean(pupilSizeB,1);
     pSeB = nanstd(pupilSizeB,1)./sqrt(sum(~isnan(pupilSizeB),1));
     shadedErrorBar(1:size(pupilSizeB,2),pMeanB,pSeB,'lineprops', '-r');
-    plot(pupilSizeB','color',[1 0 0 0.5]);
+    plot(pupilSizeB','color',[1 0 0 0.25]);
     
     minPlot = min(min(pMeanB-pSeB*3),min(pMeanSU-pSeSU*3));
     maxPlot = max(max(pMeanB+pSeB*3),max(pMeanSU+pSeSU*3));
     if i == 1
-        title('During the trial');
+        title('During the trial for BK vs SU');
     elseif i == 2
-        title('In trial begining');
+        title('In trial begining for BK vs SU');
         plot([200 200],[minPlot,maxPlot],'-.k');
     elseif i == 3
-        title('During choice')
+        title('During choice for BK vs SU')
+        plot([1000 1000],[minPlot,maxPlot],'-.k');
+    end
+    
+    figure(length(ed)+1+i);
+    
+    % may need update for different degree design
+    dangerTrial = and(log.Conditions(:,3) >= 50,log.Conditions(:,3) <= 65); 
+    
+    if length(dangerTrial) > size(pupilSize,2)
+        dangerTrial(end-(length(dangerTrial)-size(pupilSize,2))+1:end) = [];
+    end
+    safeTrial = ~dangerTrial;
+    
+    pupilSizeSF = pupilSize(:,safeTrial')';
+    pMeanSF = nanmean(pupilSizeSF,1);
+    pSeSF = nanstd(pupilSizeSF,1)./sqrt(sum(~isnan(pupilSizeSF),1));
+    shadedErrorBar(1:size(pupilSizeSF,2),pMeanSF,pSeSF,'lineprops', '-g');
+    hold on
+    plot(pupilSizeSF','color',[0 1 0 0.25]);
+    
+    pupilSizeD = pupilSize(:,dangerTrial')';
+    pMeanD = nanmean(pupilSizeD,1);
+    pSeD = nanstd(pupilSizeD,1)./sqrt(sum(~isnan(pupilSizeD),1));
+    shadedErrorBar(1:size(pupilSizeD,2),pMeanD,pSeD,'lineprops', '-r');
+    plot(pupilSizeD','color',[1 0 0 0.25]);
+    
+    minPlot = min(min(pMeanD-pSeD*3),min(pMeanSF-pSeSF*3));
+    maxPlot = max(max(pMeanD+pSeD*3),max(pMeanSF+pSeSF*3));
+    if i == 1
+        title('During the trial for S vs D');
+    elseif i == 2
+        title('In trial begining for S vs D');
+        plot([200 200],[minPlot,maxPlot],'-.k');
+    elseif i == 3
+        title('During choice for S vs D')
         plot([1000 1000],[minPlot,maxPlot],'-.k');
     end
 end
