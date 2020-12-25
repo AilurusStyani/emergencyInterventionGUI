@@ -309,7 +309,7 @@ for i = 1:length(ed)
     figure(1+i);cgf
     hold off
     pupilSize = nan(max(ed{i}-st{i}),length(st{i}));
-    for j = 1:length(st{i})-1
+    for j = 1:length(st{i})
         sP = find(data.eyeData(:,1) >= st{i}(j),1);
         basement = mean(data.eyeData(sP:sP+100,4));
         eP = find(data.eyeData(:,1) <= ed{i}(j),1,'last');
